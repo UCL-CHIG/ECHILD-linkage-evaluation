@@ -5,39 +5,42 @@ log 				using "${logdir}\q_uniqueAPMRsbyspringcensuslink_$S_DATE.log", replace
 timer				clear
 timer				on 1 // start timer for whole do-file
 /*==============================================================================
-Project: 			ECHILD - Max Verfuerden (my goal is to evaluate linkage)
+Project: 			ECHILD (linkage evaluation)
 Purpose: 			Answer question: how many unique APMRs (=pupils) are there in each module
-					by spring_census link status?
+				by spring_census link status?
 Author: 			maximiliane verfuerden
 Created:			Mon 07 Jun 2021
-Last modified:		Tue 08 Jun 2021
-Last run:			Tue 08 Jun 2021
+Last modified:			Wed 09 Jun 2021
+Last run:			Wed 09 Jun 2021
 ***
 ===============================================================================*/
 use 				"${datadir_max}\ECHILD_aPMR_and_hesID_combinedbridgefiles.dta", clear
-sort				pupilmatchingrefanonymous
-drop if				pupilmatchingrefanonymous =="" 
-drop				encrypted*
-*sort so that the best matches will get the aPMRvals==1
+***Sorting the best pupil-patient matches to the front:***
+**********************************************************
+*transform matchstep variable so it corresponds to steps 1-8:
 replace 			pds_matchstep=89999 if pds_matchstep==80
 replace 			pds_matchstep=79999 if pds_matchstep==70
-gen 				step_pds_matchstep=int(pds_matchstep/10000) 
-gen 				year_pds_matchstep=pds_matchstep-int(pds_matchstep/10000)*10000
-replace				pds_matchstep = step_pds_matchstep
-drop				step_pds_matchstep
-label var 			pds_matchstep "Step Linkage Stage 1"
-label var 			year_pds_matchstep "Year Linkage Stage 1"
-label var 			hes_matchstep "Step Linkage Stage 2"
-sort				pupilmatchingrefanonymous pds_matchstep hes_matchstep  // making sure that those with better matchsteps come first
-*what is total number of unique APMRs?
+replace 			pds_matchstep=int(pds_matchstep/10000) 
+*Making sure that those without matches (match=.) get sorted furthest down:
+replace				pds_matchstep = 9 if pds_matchstep==.
+replace				hes_matchstep  = 9 if hes_matchstep==.
+*Making sure that bad matches (=higher values) get sorted furthest down:
+gen				link_certainty = string(pds_matchstep) + "." + string(hes_matchstep)
+drop				matchstep*
+*Add the link_certainty in front of the encrypted_hesid, so that the encrypted_hesid with the lowest (=more certain) values get sorted to the front:
+replace				encrypted_hesid = link_certainty + "_" + encrypted_hesid
+*What is the total number of unique APMRs?
 bys 				pupilmatchingrefanonymous: gen aPMRvals=_n 
 count				if aPMRvals ==1 
 return				list
-gen					total_uniqueAPMRs = r(N)
+gen				total_uniqueAPMRs = r(N)
 count
-* this must be an error there is a pupil with >5000 different records
-drop				if aPMRvals>7
-*total number according to module?
+*Sort the pupil-patient combinations:
+sort				pupilmatchingrefanonymous encrypted_hesid // strongest matches come first
+*What is the number of records within each patient-pupil combination?
+bys				pupilmatchingrefanonymous encrypted_hesid: gen recordval=_n
+*keep only the variables I am interested in:
+keep				pupilmatchingrefanonymous encrypted_hesid recordval link_certainty spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis 
 reshape				wide spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis total_uniqueAPMRs, i(pupilmatchingrefanonymous) j(aPMRvals)	
 foreach module in spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis {
 egen				`module' = anymatch(`module'*), values(1)
