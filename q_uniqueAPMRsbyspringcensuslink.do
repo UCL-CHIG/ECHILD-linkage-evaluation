@@ -39,12 +39,33 @@ count
 sort				pupilmatchingrefanonymous encrypted_hesid // strongest matches come first
 *What is the number of records within each patient-pupil combination?
 bys				pupilmatchingrefanonymous encrypted_hesid: gen recordval=_n
-*keep only the variables I am interested in:
+*Keep only the variables I am interested in:
 keep				pupilmatchingrefanonymous encrypted_hesid recordval link_certainty spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis 
-reshape				wide spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis total_uniqueAPMRs, i(pupilmatchingrefanonymous) j(aPMRvals)	
-foreach module in spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis {
-egen				`module' = anymatch(`module'*), values(1)
+*Reshape to wide, so there is one record per pupil-patient combination, with the strongest combination first (because I sorted on that earlier):
+reshape				wide spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis, i(pupilmatchingrefanonymous) j(recordval)	
+***Keep only the first/best pupil-patient match***
+**************************************************
+bys				pupilmatchingrefanonymous: gen matchnumber =_n
+keep				if matchnumber ==1
+count 				// now there is only 1 row for each unique pupil id (total number of records is = total_uniqueAPMRs, generated above)
+***What is the number of unique pupils within each module?***
+*************************************************************
+foreach module in 		spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis {
+egen				matched_to_`module' = anymatch(`module'*), values(1)
+count				if matched_to_`module'==1
+return				list
+gen				`module'_uniquepupils
 }
+***What is the number of unique pupils within each module that do not link to the spring census?***
+***************************************************************************************************
+foreach module in 		spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis {
+egen				matched_to_`module' = anymatch(`module'*), values(1)
+count				if matched_to_`module'==1
+return				list
+gen				`module'_uniquepupils
+}
+
+
 count
 foreach module in spring summer autumn ap pru eyc eyfsp ks2 ks4 ks5 nccis {
 bys					pupilmatchingrefanonymous: gen `module'_apmrval=_n if `module' ==1
