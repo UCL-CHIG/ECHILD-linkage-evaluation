@@ -6,8 +6,7 @@ timer				clear
 timer				on 1 // start timer for whole do-file
 /*==============================================================================
 Project: 			ECHILD (linkage evaluation)
-Purpose: 			Answer question: how many unique APMRs (=pupils) are there in each module
-				by spring_census link status?
+Purpose: 			Answer question: how many unique APMRs (=pupils) are there in each module by spring_census link status? (For Ruth's slide)
 Author: 			maximiliane verfuerden
 Created:			Mon 07 Jun 2021
 Last modified:			Wed 09 Jun 2021
@@ -54,36 +53,20 @@ foreach module in 		spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 ncci
 egen				matched_to_`module' = anymatch(`module'*), values(1)
 count				if matched_to_`module'==1
 return				list
-gen				`module'_uniquepupils
+gen				`module'_uniquepupils = r(N)
 }
 ***What is the number of unique pupils within each module that do not link to the spring census?***
 ***************************************************************************************************
-foreach module in 		spring summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis {
-egen				matched_to_`module' = anymatch(`module'*), values(1)
-count				if matched_to_`module'==1
+foreach module in 		summer autumn plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis {
+egen				matched_to_`module'_but_not_spring = anymatch(`module'*) if matched_to_spring == 0, values(1)
+count				if matched_to_`module'_but_not_spring==1
 return				list
-gen				`module'_uniquepupils
+gen				`module'_not_spring_uniquepupils = r(N)
 }
-
-
-count
-foreach module in spring summer autumn ap pru eyc eyfsp ks2 ks4 ks5 nccis {
-bys					pupilmatchingrefanonymous: gen `module'_apmrval=_n if `module' ==1
-count				if `module'_apmrval ==1 
-return				list
-gen					`module'_uniquepupils = r(N)
-}
-count
-*total number according to module if not in spring census
-foreach module in summer autumn ap pru eyc eyfsp ks2 ks4 ks5 nccis {
-bys					pupilmatchingrefanonymous: gen `module'_notspring_apmrval=_n if `module' ==1 & spring ==0
-count				if `module'_notspring_apmrval ==1 
-return				list
-gen					`module'_notspring_uniquepupils = r(N)
-}		
-*export as spreadsheet
+***Export as spreadsheet***
+***************************
 preserve
-drop 				pupilmatchingrefanonymous spring autumn summer plasc ap pru eyc eyfsp ks2 ks4 ks5 nccis *apmr*		
+keep 				*unique*
 duplicates			drop
 format				*_* %10.0fc
 *export count of unique IDs by NPD module and by springlinkstatus into a spreadsheet
@@ -92,6 +75,6 @@ restore
 *===============================================================================
 timer				off 1
 timer 				list 1
-display as input	"duration of this do-file: " r(t1) / 60 " minutes"
+display as input		"duration of this do-file: " r(t1) / 60 " minutes"
 timer 				clear 
 log 				close
